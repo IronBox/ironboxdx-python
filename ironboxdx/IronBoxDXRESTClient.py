@@ -10,6 +10,7 @@
 #       8/14/2019   - v1.1: Added from text method for uploading server side encrypted (SSE) container blobs, code clean up
 #       9/10/2019   - v1.2: Added download server-side encrypted (SSE) blob to file path, list SSE blobs, delete SSE blob, management read container meta data
 #       9/11/2019   - v1.3: Create and delete SSE container, list storage endpoints that the user has access to
+#       2/26/2020   - v1.4: Enable/disable user via management API
 #
 #   Additional Information:
 #   -----------------------
@@ -350,3 +351,17 @@ class IronBoxDXRESTClient():
         return readMetaDataResponse
 
 
+    #--------------------------------------------------------------------------
+    #   Enable/disable entity organization membership status
+    #--------------------------------------------------------------------------
+    def management_setEntityOrganizationMembershipStatus(self, memberEmail, enabled):
+        self.__log("Setting organization membership for user [{}] to {}".format(memberEmail, enabled))
+        post_enableUser_body = {
+            "memberEmail" : memberEmail,
+            "enabled" : enabled
+        }
+        enableUserPostResponse = self.__sendPost("dx/management/organization/user/membership/status/set/api", post_enableUser_body)
+        if enableUserPostResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to set organization user status")
+        enableUserResponse = enableUserPostResponse.json()
+        return enableUserResponse
