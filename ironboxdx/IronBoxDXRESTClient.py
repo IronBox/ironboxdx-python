@@ -11,6 +11,13 @@
 #       9/10/2019   - v1.2: Added download server-side encrypted (SSE) blob to file path, list SSE blobs, delete SSE blob, management read container meta data
 #       9/11/2019   - v1.3: Create and delete SSE container, list storage endpoints that the user has access to
 #       2/26/2020   - v1.4: Enable/disable user via management API
+#       3/24/2020   - v1.5: Updated routes for enabling/disabling organization member entities (legacy was 'user', new is 'entities', both will work), 
+#                           Added support for: 
+#                               - List org member entities
+#                               - Read org member meta data
+#                               - Set container data ttl
+#                               - Set container metadata
+#                               - Custom security group (create, delete, update, add/remove member, list, read)
 #
 #   Additional Information:
 #   -----------------------
@@ -335,6 +342,10 @@ class IronBoxDXRESTClient():
         # Done
         self.__log("Upload complete")
 
+    '''
+    Note: Management API calls must use API keys whose owners are administrators of their
+    organizations for these calls to work
+    '''
 
     #--------------------------------------------------------------------------
     #   Reads the meta data for a container
@@ -360,8 +371,208 @@ class IronBoxDXRESTClient():
             "memberEmail" : memberEmail,
             "enabled" : enabled
         }
-        enableUserPostResponse = self.__sendPost("dx/management/organization/user/membership/status/set/api", post_enableUser_body)
+        enableUserPostResponse = self.__sendPost("dx/management/organization/entities/membership/status/set/api", post_enableUser_body)
         if enableUserPostResponse.status_code != requests.codes["ok"]:
             raise Exception("Unable to set organization user status")
         enableUserResponse = enableUserPostResponse.json()
         return enableUserResponse
+
+    #--------------------------------------------------------------------------
+    #   Create an entity organization membership status
+    #
+    #   Remarks:
+    #   - The entity/user must not already exist
+    #   - The organization that the API key belongs to must have 'security
+    #     authority' over the domain of the user. Example: If you are trying to 
+    #     create the user test@domain.com, the parent organization of the API
+    #     key being used must have security authority over the domain "domain.com"
+    #     (ask your IronBox team representative to configure this)
+    #   - Password must comply with parent organization security policy
+    #   - If you are creating the entity with its organization membership enabled,
+    #     that organization must have available user licenses available.
+    #     You can create unlimited number of disabled user accounts
+    #--------------------------------------------------------------------------
+    def management_createOrganizationEntity(self, memberEmail, memberPassword, enabled):
+        self.__log("Creating an organization entity account for {}, enabled = {}".format(memberEmail, enabled))
+        post_createUser_body = {
+            "email" : memberEmail,
+            "password" : memberPassword,
+            "enabled" : enabled
+        }
+        createUserPostResponse = self.__sendPost("dx/management/organization/entities/create/api", post_createUser_body)
+        if createUserPostResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to create organization entity")
+        createUserResponse = createUserPostResponse.json()
+        return createUserResponse
+
+    #--------------------------------------------------------------------------
+    #   List the member entities of an organization
+    #--------------------------------------------------------------------------
+    def management_listOrganizationMemberEntities(self, skipPastNumItems = 0, takeNumItems = -1):
+        self.__log("Listing organization members")
+        post_listOrgMemberEntities_body = {
+            "skipPastNumItems" : skipPastNumItems,
+            "takeNumItems" : takeNumItems
+        }
+        listOrgMembersPostResponse = self.__sendPost("dx/management/organization/entities/api", post_listOrgMemberEntities_body)
+        if listOrgMembersPostResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to list organization member entities")
+        listOrgMembersResponse = listOrgMembersPostResponse.json()
+        return listOrgMembersResponse
+    
+    #--------------------------------------------------------------------------
+    #   Get an organization member entity meta data
+    #--------------------------------------------------------------------------
+    def management_readOrganizationMemberEntityMetadata(self, memberPublicID):
+        self.__log("Reading organization member entity meta data for user with publicID = {}".format(memberPublicID))
+        post_readOrgMemberEntityMetadata_body = {
+            "memberPublicID" : memberPublicID
+        }
+        readOrgMemberEntityMetadataPostResponse = self.__sendPost("dx/management/organization/entities/metadata/api", post_readOrgMemberEntityMetadata_body)
+        if readOrgMemberEntityMetadataPostResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to read organization member entity metadata")
+        readOrgMemberEntityMetadataResponse = readOrgMemberEntityMetadataPostResponse.json()
+        return readOrgMemberEntityMetadataResponse
+
+
+# START
+
+    #--------------------------------------------------------------------------
+    #   Sets the data ttl value for a container
+    #   Note: This requires that the organization has custom container data 
+    #   ttl enabled, contact the IronBox team to enable this
+    #--------------------------------------------------------------------------
+    def management_setContainerDataTtl(self, containerPublicID, containerDataTTLHours, containerDataTTLEnabled):
+        self.__log("Setting data ttl for container with publicID = {}".format(containerPublicID))
+        post_body = {
+            "containerPublicID" : containerPublicID,
+            "containerDataTTLHours" : containerDataTTLHours,
+            "containerDataTTLEnabled" : containerDataTTLEnabled
+        }
+        postResponse = self.__sendPost("dx/management/container/datattl/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to set container data ttl")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Sets meta data for a container
+    #   Valid values for metaDataTarget:
+    #   
+    #   0 = Migrated IronBoxSFT ContainerID
+    #--------------------------------------------------------------------------
+    def management_setContainerMetadata(self, containerPublicID, metaDataTarget, metaDataValue):
+        self.__log("Setting metadata for container with publicID = {}".format(containerPublicID))
+        post_body = {
+            "containerPublicID" : containerPublicID,
+            "metaDataTarget" : metaDataTarget,
+            "metaDataValue" : metaDataValue
+        }
+        postResponse = self.__sendPost("dx/management/container/metadata/set/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to set container metadata")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Creates a custom security group
+    #--------------------------------------------------------------------------
+    def management_createCustomSecurityGroup(self, name, enabled):
+        self.__log("Creating custom security group named = {}, enabled = {}".format(name,enabled))
+        post_body = {
+            "name" : name,
+            "enabled" : enabled
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/create/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to create custom security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Deletes a custom security group
+    #--------------------------------------------------------------------------
+    def management_deleteCustomSecurityGroup(self, publicID):
+        self.__log("Deleting custom security group with publicID {}".format(publicID))
+        post_body = {
+            "publicID" : publicID
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/delete/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to delete custom security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Updates a custom security group
+    #--------------------------------------------------------------------------
+    def management_updateCustomSecurityGroup(self, publicID, name, enabled):
+        self.__log("Updating custom security group with publicID {}".format(publicID))
+        post_body = {
+            "publicID" : publicID,
+            "name" : name,
+            "enabled" : enabled
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/update/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to update custom security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Adds a member to a custom security group
+    #--------------------------------------------------------------------------
+    def management_addMemberToCustomSecurityGroup(self, publicID, memberEmail):
+        self.__log("Adding member to custom security group with publicID {}, email = {}".format(publicID, memberEmail))
+        post_body = {
+            "publicID" : publicID,
+            "memberEmail" : memberEmail
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/addmember/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to add member to custom security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Removes a member from a custom security group
+    #--------------------------------------------------------------------------
+    def management_removeMemberFromCustomSecurityGroup(self, publicID, memberEmail):
+        self.__log("Removing member from custom security group with publicID {}, email = {}".format(publicID, memberEmail))
+        post_body = {
+            "publicID" : publicID,
+            "memberEmail" : memberEmail
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/removemember/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to remove member from custom security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   List custom security groups
+    #--------------------------------------------------------------------------
+    def management_listCustomSecurityGroups(self):
+        self.__log("Listing custom security groups")
+        post_body = {
+            # No body required for this call
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to list custom security groups")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Read custom security group
+    #--------------------------------------------------------------------------
+    def management_readCustomSecurityGroup(self, publicID):
+        self.__log("Reading custom security group with publicID = {}".format(publicID))
+        post_body = {
+            "publicID" : publicID
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/custom/read/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to read custom security group")
+        response = postResponse.json()
+        return response
