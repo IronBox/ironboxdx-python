@@ -434,9 +434,6 @@ class IronBoxDXRESTClient():
         readOrgMemberEntityMetadataResponse = readOrgMemberEntityMetadataPostResponse.json()
         return readOrgMemberEntityMetadataResponse
 
-
-# START
-
     #--------------------------------------------------------------------------
     #   Sets the data ttl value for a container
     #   Note: This requires that the organization has custom container data 
