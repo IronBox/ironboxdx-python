@@ -11,13 +11,15 @@
 #       9/10/2019   - v1.2: Added download server-side encrypted (SSE) blob to file path, list SSE blobs, delete SSE blob, management read container meta data
 #       9/11/2019   - v1.3: Create and delete SSE container, list storage endpoints that the user has access to
 #       2/26/2020   - v1.4: Enable/disable user via management API
-#       3/24/2020   - v1.5: Updated routes for enabling/disabling organization member entities (legacy was 'user', new is 'entities', both will work), 
+#       3/23/2020   - v1.5: Updated routes for enabling/disabling organization member entities (legacy was 'user', new is 'entities', both will work), 
 #                           Added support for: 
 #                               - List org member entities
 #                               - Read org member meta data
 #                               - Set container data ttl
 #                               - Set container metadata
 #                               - Custom security group (create, delete, update, add/remove member, list, read)
+#       4/6/2020    - v1.6: Minor fix spelling mistake from REST response for initializing SSE blob (cloubBlobStorageName -> cloudBlobStorageName), 
+#                           spelling mistake is kept in REST API for legacy applications, works only with version 3.0.5.26 version of REST API
 #
 #   Additional Information:
 #   -----------------------
@@ -292,7 +294,7 @@ class IronBoxDXRESTClient():
         self.sas_service.create_blob_from_path(
             file_path=sourceFilePath, 
             progress_callback=self.__upload_callback, 
-            blob_name=initResponse["cloubBlobStorageName"], 
+            blob_name=initResponse["cloudBlobStorageName"], 
             container_name=initResponse["cloudContainerStorageName"])
         
         # Signal that the upload is completed
@@ -328,7 +330,7 @@ class IronBoxDXRESTClient():
             text=sourceText, 
             encoding=encoding, 
             progress_callback=self.__upload_callback, 
-            blob_name=initResponse["cloubBlobStorageName"], 
+            blob_name=initResponse["cloudBlobStorageName"], 
             container_name=initResponse["cloudContainerStorageName"]
         )
 
