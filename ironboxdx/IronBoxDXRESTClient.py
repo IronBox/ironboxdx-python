@@ -18,8 +18,11 @@
 #                               - Set container data ttl
 #                               - Set container metadata
 #                               - Custom security group (create, delete, update, add/remove member, list, read)
+#                               - Creating organization entity
 #       4/6/2020    - v1.6: Minor fix spelling mistake from REST response for initializing SSE blob (cloubBlobStorageName -> cloudBlobStorageName), 
 #                           spelling mistake is kept in REST API for legacy applications, works only with version 3.0.5.26 version of REST API
+#       6/1/2020    - v1.7: Added management API support for reading/setting container link-based access settings
+#       8/12/2020   - v1.8: Added management API support for adding to/removing from/reading built-in security groups
 #
 #   Additional Information:
 #   -----------------------
@@ -573,5 +576,81 @@ class IronBoxDXRESTClient():
         postResponse = self.__sendPost("dx/management/organization/secgroups/custom/read/api", post_body)
         if postResponse.status_code != requests.codes["ok"]:
             raise Exception("Unable to read custom security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Read container link-based access settings
+    #--------------------------------------------------------------------------
+    def management_readContainerLinkBasedAccessSettings(self, publicID):
+        self.__log("Reading container link-based access settings with publicID = {}".format(publicID))
+        post_body = {
+            "publicID" : publicID
+        }
+        postResponse = self.__sendPost("dx/management/container/settings/linkbased/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to read container link-based settings")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Set container link-based access settings
+    #--------------------------------------------------------------------------
+    def management_setContainerLinkBasedAccessSettings(self, publicID, enabled, canRead, canWrite, accessPassword):
+        self.__log("Setting container link-based access settings with publicID = {}".format(publicID))
+        post_body = {
+            "publicID" : publicID,
+            "enabled" : enabled,
+            "canRead" : canRead,
+            "canWrite" : canWrite,
+            "accessPassword" : accessPassword
+        }
+        postResponse = self.__sendPost("dx/management/container/settings/linkbased/set/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to set container link-based settings")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Add to built-in security group
+    #--------------------------------------------------------------------------
+    def management_addMemberToBuiltInSecurityGroup(self, groupName, memberEmail):
+        self.__log("Adding member {} to built-in security group {}".format(memberEmail,groupName))
+        post_body = {
+            "groupName" : groupName,
+            "memberEmail" : memberEmail,
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/builtin/addmember/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to add member to built-in security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Remove from built-in security group
+    #--------------------------------------------------------------------------
+    def management_removeMemberFromBuiltInSecurityGroup(self, groupName, memberEmail):
+        self.__log("Removing member {} from built-in security group {}".format(memberEmail,groupName))
+        post_body = {
+            "groupName" : groupName,
+            "memberEmail" : memberEmail,
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/builtin/removemember/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to remove member from built-in security group")
+        response = postResponse.json()
+        return response
+
+    #--------------------------------------------------------------------------
+    #   Read bulit-in security group
+    #--------------------------------------------------------------------------
+    def management_readBuiltInSecurityGroup(self, groupName):
+        self.__log("Reading built-in security group {}".format(groupName))
+        post_body = {
+            "groupName" : groupName
+        }
+        postResponse = self.__sendPost("dx/management/organization/secgroups/builtin/read/api", post_body)
+        if postResponse.status_code != requests.codes["ok"]:
+            raise Exception("Unable to read built-in security group")
         response = postResponse.json()
         return response
