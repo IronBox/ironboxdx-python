@@ -3,14 +3,16 @@
 #   Sample Python script to add/remove/read organization entities to built-in security groups
 #
 #   Remarks:
-#   The following group names are supported:
-#       - sse_creators      (add/remove/read)
-#       - sse_readers       (add/remove/read)
-#       - administrators    (read)
-#       - developers        (read)
+#   The following group names are supported (case-sensitive):
+#
+#       - sse_creators|SseContainerServiceCreator       (add/remove/read)
+#       - sse_readers|SseContainerServiceReader         (add/remove/read)
+#       - administrators                                (read)
+#       - developers                                    (read)
 #
 #   Revision History:
-#       8/12/2020        Initial release
+#       8/12/2020       Initial release
+#       9/10/2020       Support group names "SseContainerServiceCreator" and "SseContainerServiceReader"
 #
 import os
 import json
