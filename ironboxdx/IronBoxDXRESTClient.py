@@ -23,6 +23,7 @@
 #                           spelling mistake is kept in REST API for legacy applications, works only with version 3.0.5.26 version of REST API
 #       6/1/2020    - v1.7: Added management API support for reading/setting container link-based access settings
 #       8/12/2020   - v1.8: Added management API support for adding to/removing from/reading built-in security groups
+#       10/7/2020   - v1.9: Add support to read/set container notification settings, list/add/remove users and custom security groups to container ACLs
 #
 #   Additional Information:
 #   -----------------------
@@ -346,6 +347,116 @@ class IronBoxDXRESTClient():
         
         # Done
         self.__log("Upload complete")
+
+
+    #--------------------------------------------------------------------------
+    #   Reads the notification settings for a container (SSE or CSE)
+    #--------------------------------------------------------------------------
+    def getContainerNotificationSettings(self, containerPublicID):
+        self.__log("Reading container notification settings")
+        post_notification_body = {
+            "containerPublicID" : containerPublicID
+        }
+        notificationPostResponse = self.__sendPost("dx/cloud/container/notification/get/api", post_notification_body)
+        if (notificationPostResponse.status_code != requests.codes["ok"]):
+            raise Exception("Unable to read container notification settings")
+        notificationResponse = notificationPostResponse.json()
+        self.__log("Read container notification settings completed")
+        return notificationResponse
+
+
+    #--------------------------------------------------------------------------
+    #   Sets the notification settings for a container (SSE or CSE)
+    #--------------------------------------------------------------------------
+    def setContainerNotificationSettings(self, containerPublicID, uploadNotificationList, downloadNotificationList):
+        self.__log("Setting container notification settings")
+        post_notification_body = {
+            "containerPublicID" : containerPublicID,
+            "uploadNotificationList" : uploadNotificationList,
+            "downloadNotificationList" : downloadNotificationList
+        }
+        notificationPostResponse = self.__sendPost("dx/cloud/container/notification/set/api", post_notification_body)
+        if (notificationPostResponse.status_code != requests.codes["ok"]):
+            raise Exception("Unable to set container notification settings")
+        notificationResponse = notificationPostResponse.json()
+        self.__log("Set container notification settings completed")
+        return notificationResponse
+
+    #--------------------------------------------------------------------------
+    #   Adds a user to a SSE container's ACLs
+    #--------------------------------------------------------------------------
+    def addUserToSSEContainerACLs(self, containerPublicID, userEmail, canRead, canWrite, isAdmin, enabled, availableUtc = "", expiresUtc = ""):
+        self.__log("Adding user to server-side encrypted container ACLs")
+        post_sseContainerACL_body = {
+            "containerPublicID" : containerPublicID,
+            "userEmail" : userEmail,
+            "canRead" : canRead,
+            "canWrite" : canWrite,
+            "isAdmin" : isAdmin,
+            "enabled" : enabled,
+            "availableUtc" : availableUtc,
+            "expiresUtc" : expiresUtc
+        }
+        sseACLPostResponse = self.__sendPost("dx/cloud/sse/containers/acl/add/api", post_sseContainerACL_body)
+        if (sseACLPostResponse.status_code != requests.codes["ok"]):
+            raise Exception("Unable to add user to server-side encrypted container ACLs")
+        sseACLResponse = sseACLPostResponse.json()
+        self.__log("Add user to SSE container ACLs completed")
+        return sseACLResponse
+
+    #--------------------------------------------------------------------------
+    #   Adds a custom security group to a SSE container's ACLs
+    #--------------------------------------------------------------------------
+    def addCustomSecurityGroupToSSEContainerACLs(self, containerPublicID, customSecurityGroupPublicID, canRead, canWrite, isAdmin, enabled, availableUtc = "", expiresUtc = ""):
+        self.__log("Adding custom security group to server-side encrypted container ACLs")
+        post_sseContainerACL_body = {
+            "containerPublicID" : containerPublicID,
+            "customSecurityGroupPublicID" : customSecurityGroupPublicID,
+            "canRead" : canRead,
+            "canWrite" : canWrite,
+            "isAdmin" : isAdmin,
+            "enabled" : enabled,
+            "availableUtc" : availableUtc,
+            "expiresUtc" : expiresUtc
+        }
+        sseACLPostResponse = self.__sendPost("dx/cloud/sse/containers/acl/secgroups/custom/add/api", post_sseContainerACL_body)
+        if (sseACLPostResponse.status_code != requests.codes["ok"]):
+            raise Exception("Unable to add custom security group to server-side encrypted container ACLs")
+        sseACLResponse = sseACLPostResponse.json()
+        self.__log("Add custom security group to SSE container ACLs completed")
+        return sseACLResponse
+
+    #--------------------------------------------------------------------------
+    #   Removes a single SSE container ACL
+    #--------------------------------------------------------------------------
+    def deleteSSEContainerACL(self, containerPublicID, membershipPublicID):
+        self.__log("Removing server-side encrypted container ACL")
+        post_sseContainerACL_body = {
+            "containerPublicID" : containerPublicID,
+            "membershipPublicID" : membershipPublicID
+        }
+        sseACLPostResponse = self.__sendPost("dx/cloud/sse/containers/acl/delete/api", post_sseContainerACL_body)
+        if (sseACLPostResponse.status_code != requests.codes["ok"]):
+            raise Exception("Unable to remove server-side encrypted container ACL")
+        sseACLResponse = sseACLPostResponse.json()
+        self.__log("Remove SSE container ACL completed")
+        return sseACLResponse
+
+    #--------------------------------------------------------------------------
+    #   Reads the ACLs for a SSE container
+    #--------------------------------------------------------------------------
+    def listSSEContainerACLs(self, containerPublicID):
+        self.__log("Reading server-side encrypted container ACLs")
+        post_sseContainerACL_body = {
+            "publicID" : containerPublicID
+        }
+        sseACLPostResponse = self.__sendPost("dx/cloud/sse/containers/acl/list/api", post_sseContainerACL_body)
+        if (sseACLPostResponse.status_code != requests.codes["ok"]):
+            raise Exception("Unable to read server-side encrypted container ACLs")
+        sseACLResponse = sseACLPostResponse.json()
+        self.__log("SSE container ACLs listing completed")
+        return sseACLResponse
+
 
     '''
     Note: Management API calls must use API keys whose owners are administrators of their
