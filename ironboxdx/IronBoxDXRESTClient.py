@@ -24,11 +24,15 @@
 #       6/1/2020    - v1.7: Added management API support for reading/setting container link-based access settings
 #       8/12/2020   - v1.8: Added management API support for adding to/removing from/reading built-in security groups
 #       10/7/2020   - v1.9: Add support to read/set container notification settings, list/add/remove users and custom security groups to container ACLs
+#       12/29/2022  - v2.0: Updated REST client to use azure-storage-blob >= 12.0.0 from azure-4.0.0, see "IronBox/ironboxdx-python-azure4-legacy" fork for legacy REST client
 #
 #   Additional Information:
 #   -----------------------
 #       https://github.com/Azure/azure-storage-python
+#       https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob?view=azure-python
+#       https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient?view=azure-python
 #
+
 import requests
 import json
 import os
@@ -40,11 +44,9 @@ from urllib.parse import (
 )
 
 from azure.storage.blob import (
-    BlockBlobService,
-    ContainerPermissions,
-    BlobPermissions,
-    PublicAccess,
+    BlobClient,
 )
+
 from azure.storage.common import (
     AccessPolicy,
     ResourceTypes,
@@ -86,11 +88,6 @@ class IronBoxDXRESTClient():
     def __log(self, message):
         if self.__verbose:
             print(message)
-
-    # Extracts the Azure storage account name from a given access signature URI
-    def __extractStorageAccountName(self, accessSignatureUri):
-        storage_account_name = urlparse(accessSignatureUri).hostname.split('.')[0]
-        return storage_account_name
 
     def __progressbar(self, current, total, label="", progressBarSize=40, outstream=sys.stdout):
         def show(j):
@@ -268,13 +265,13 @@ class IronBoxDXRESTClient():
         if downloadPostResponse.status_code != requests.codes["ok"]:
             raise Exception("Unable to download SSE blob")
         downloadResponse = downloadPostResponse.json()
-        storage_account_name = self.__extractStorageAccountName(downloadResponse["accessSignatureUri"])   # Extract the Azure account name
-        self.sas_service = BlockBlobService(account_name=storage_account_name, sas_token=downloadResponse["accessToken"])
-        self.sas_service.get_blob_to_path(
-            file_path=destinationFilePath,
-            blob_name=downloadResponse["cloudBlobStorageName"], 
-            container_name=downloadResponse["cloudContainerStorageName"],
-            progress_callback=self.__download_callback)
+
+        # Create blob client reference from the download response shared access signature and 
+        # download to specified destination path
+        self.sas_service = BlobClient.from_blob_url(downloadResponse["accessSignatureUri"])
+        with open(destinationFilePath, "wb") as downloaded_blob:
+            download_stream = self.sas_service.download_blob(progress_hook=self.__download_callback)
+            downloaded_blob.write(download_stream.readall())
         
         self.__log("Download complete")
 
@@ -284,29 +281,23 @@ class IronBoxDXRESTClient():
     #--------------------------------------------------------------------------
     def uploadBlobToSSEContainerFromPath(self, containerPublicID, blobName, sourceFilePath, blobDescription = "", containerAccessPassword = ""):
 
-        
         self.__log("Uploading [{}] to server-side encrypted container with public ID [{}] as blob with name [{}]".format(sourceFilePath, containerPublicID, blobName))
 
         # Initialize an SSE blob
         initResponse = self.__initializeBlobToSSEContainer(containerPublicID=containerPublicID, blobName=blobName, blobDescription=blobDescription, containerAccessPassword=containerAccessPassword)
 
-        # Upload the contents to storage backend, create a account service reference from the 
-        # shared access signature we received from the initialization process
+        # Create a blob client reference from the shared access signature provided by the 
+        # initialization response
         self.__log("Uploading contents to cloud storage")
-        storage_account_name = self.__extractStorageAccountName(initResponse["accessSignatureUri"])   # Extract the Azure account name
-        self.sas_service = BlockBlobService(account_name=storage_account_name, sas_token=initResponse["accessToken"])
-        self.sas_service.create_blob_from_path(
-            file_path=sourceFilePath, 
-            progress_callback=self.__upload_callback, 
-            blob_name=initResponse["cloudBlobStorageName"], 
-            container_name=initResponse["cloudContainerStorageName"])
+        self.sas_service = BlobClient.from_blob_url(initResponse["accessSignatureUri"])
+        with open(sourceFilePath,"rb") as data:
+            file_size = os.path.getsize(sourceFilePath)
+            self.sas_service.upload_blob(data=data, blob_type="BlockBlob", length=file_size, overwrite=True, progress_hook=self.__upload_callback)
         
         # Signal that the upload is completed
-        #st = os.stat(sourceFilePath)
         finalizeResponse = self.__finalizeBlobInSSEContainer(
             finalizeToken=initResponse['finalizeToken'], 
             blobPublicID=initResponse['blobPublicID'], 
-            #blobSizeBytes=st.st_size
             blobSizeBytes=self.__lastUploadTotalBytes
         )
         
@@ -325,18 +316,11 @@ class IronBoxDXRESTClient():
         # Initialize an SSE blob
         initResponse = self.__initializeBlobToSSEContainer(containerPublicID=containerPublicID, blobName=blobName,  blobDescription=blobDescription, containerAccessPassword=containerAccessPassword)
 
-        # Upload the contents to storage backend, create a account service reference from the 
-        # shared access signature we received from the initialization process
+        # Create a blob client reference from the shared access signature provided by the 
+        # initialization response
         self.__log("Uploading contents to cloud storage")
-        storage_account_name = self.__extractStorageAccountName(initResponse["accessSignatureUri"])   # Extract the Azure account name
-        self.sas_service = BlockBlobService(account_name=storage_account_name, sas_token=initResponse["accessToken"])
-        self.sas_service.create_blob_from_text(
-            text=sourceText, 
-            encoding=encoding, 
-            progress_callback=self.__upload_callback, 
-            blob_name=initResponse["cloudBlobStorageName"], 
-            container_name=initResponse["cloudContainerStorageName"]
-        )
+        self.sas_service = BlobClient.from_blob_url(initResponse["accessSignatureUri"])
+        self.sas_service.upload_blob(data=sourceText, blob_type="BlockBlob", length=len(sourceText), overwrite=True, encoding=encoding, progress_hook=self.__upload_callback)
 
         # Signal that the upload is completed
         finalizeResponse = self.__finalizeBlobInSSEContainer(
